@@ -1,17 +1,18 @@
 ﻿using System.Collections.Concurrent;
 using System.Threading.Channels;
-var htmlCollection = Channel.CreateBounded<string>(3);
+Channel<string> htmlCollection = Channel.CreateBounded<string>(4);
 
-var urls = new ConcurrentQueue<string>(new[]{
+ConcurrentQueue<string> urls = new ConcurrentQueue<string>(new[]{
     "https://www.google.com",
     "https://www.bing.com",
     "https://www.yahoo.com",
+    "https://github.com",
 });
 
 using HttpClient client = new();
-await Task.Factory.StartNew(async () =>
+await Task.Run(async () =>
 {
-    var tasks = urls.Select(async url =>
+    IEnumerable<Task> tasks = urls.Select(async url =>
     {
         var html = await (await client.GetAsync(url)).Content.ReadAsStringAsync();
         await htmlCollection.Writer.WriteAsync(html);
@@ -20,11 +21,7 @@ await Task.Factory.StartNew(async () =>
     htmlCollection.Writer.Complete();
 });
 
-
-while (await htmlCollection.Reader.WaitToReadAsync())
+await foreach (var html in htmlCollection.Reader.ReadAllAsync())
 {
-    if (htmlCollection.Reader.TryRead(out var message))
-    {
-        Console.WriteLine(message);
-    }
+    Console.WriteLine(html);
 }
